@@ -10,12 +10,12 @@ if sys.stdout.encoding != "utf-8":
     sys.stdout.reconfigure(encoding="utf-8")
 
 # ── Configuration (env vars) ─────────────────────────────────────
-SHOW_CONTEXT_SIZE = os.environ.get("AGY_CONTEXT_SIZE", os.environ.get("CQB_CONTEXT_SIZE", "0")) == "1"
-SHOW_TOKENS = os.environ.get("AGY_TOKENS", os.environ.get("CQB_TOKENS", "1")) == "1"
-SHOW_RESET = os.environ.get("AGY_RESET", os.environ.get("CQB_RESET", "1")) == "1"
-SHOW_BRANCH = os.environ.get("AGY_BRANCH", os.environ.get("CQB_BRANCH", "1")) == "1"
-SHOW_REMAINING = os.environ.get("AGY_REMAINING", os.environ.get("CQB_REMAINING", "1")) == "1"
-SHOW_BAR = os.environ.get("AGY_BAR", os.environ.get("CQB_BAR", "1")) == "1"
+SHOW_CONTEXT_SIZE = os.environ.get("AGY_CONTEXT_SIZE", "0") == "1"
+SHOW_TOKENS = os.environ.get("AGY_TOKENS", "1") == "1"
+SHOW_RESET = os.environ.get("AGY_RESET", "1") == "1"
+SHOW_BRANCH = os.environ.get("AGY_BRANCH", "1") == "1"
+SHOW_REMAINING = os.environ.get("AGY_REMAINING", "1") == "1"
+SHOW_BAR = os.environ.get("AGY_BAR", "1") == "1"
 SHOW_TASKS = os.environ.get("AGY_TASKS", "1") == "1"
 
 # ── Read stdin ──────────────────────────────────────────────────
@@ -32,7 +32,7 @@ except json.JSONDecodeError:
 
 # Terminal width budget
 MAX_WIDTH = 80
-for candidate in (d.get("terminal_width"), os.environ.get("AGY_MAX_WIDTH"), os.environ.get("CQB_MAX_WIDTH"), os.environ.get("COLUMNS")):
+for candidate in (d.get("terminal_width"), os.environ.get("AGY_MAX_WIDTH"), os.environ.get("COLUMNS")):
     try:
         width = int(candidate)
         if width > 0:
@@ -185,10 +185,13 @@ line1 = SEP.join(line1_parts)
 # Line 2: context gauge, tokens, quota, tasks
 ctx_remaining = max(0, min(100, 100 - ctx_pct_used))
 ctx_val = ctx_remaining if SHOW_REMAINING else ctx_pct_used
-filled = gauge_blocks(ctx_val)
-gauge = "\u25b0" * filled + "\u25b1" * (5 - filled)
 ctx_color = color_pct(ctx_pct_used)
-ctx_str = f"{ctx_color}{gauge}{N} {ctx_val}%"
+if SHOW_BAR:
+    filled = gauge_blocks(ctx_val)
+    gauge = "\u25b0" * filled + "\u25b1" * (5 - filled)
+    ctx_str = f"{ctx_color}{gauge}{N} {ctx_val}%"
+else:
+    ctx_str = f"{ctx_val}%"
 
 if SHOW_CONTEXT_SIZE and ctx_size:
     ctx_label = f"{ctx_size // 1_000_000}M" if ctx_size >= 1_000_000 else f"{ctx_size // 1000}K"
