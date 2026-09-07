@@ -17,7 +17,7 @@ Add the following to `~/.gemini/antigravity-cli/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "python -X utf8 C:/Users/mredw/Desktop/projects/agy-usage-monitor/statusline.py",
+    "command": "python -X utf8 C:/Users/mredw/OneDrive/Desktop/Projects/agy-usage-monitor/statusline.py",
     "enabled": true
   }
 }
@@ -26,7 +26,7 @@ Add the following to `~/.gemini/antigravity-cli/settings.json`:
 Or run directly in an active session:
 
 ```text
-/statusline python -X utf8 C:/Users/mredw/Desktop/projects/agy-usage-monitor/statusline.py
+/statusline python -X utf8 C:/Users/mredw/OneDrive/Desktop/Projects/agy-usage-monitor/statusline.py
 ```
 
 ## Configuration
@@ -43,3 +43,4 @@ Customise behaviour via environment variables (all prefixed with `AGY_`):
 | `AGY_TASKS` | `1` | `1` shows background task count; `0` hides |
 | `AGY_CONTEXT_SIZE` | `0` | `1` adds total context size label (e.g. `of 1M`) |
 | `AGY_MAX_WIDTH` | auto | Override terminal column width budget |
+
