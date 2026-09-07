@@ -17,7 +17,7 @@ Add the following to `~/.gemini/antigravity-cli/settings.json`:
 {
   "statusLine": {
     "type": "command",
-    "command": "python -X utf8 C:/Users/mredw/Desktop/agy-usage-monitor/statusline.py",
+    "command": "python -X utf8 C:/Users/mredw/Desktop/projects/agy-usage-monitor/statusline.py",
     "enabled": true
   }
 }
@@ -26,7 +26,7 @@ Add the following to `~/.gemini/antigravity-cli/settings.json`:
 Or run directly in an active session:
 
 ```text
-/statusline python -X utf8 C:/Users/mredw/Desktop/agy-usage-monitor/statusline.py
+/statusline python -X utf8 C:/Users/mredw/Desktop/projects/agy-usage-monitor/statusline.py
 ```
 
 ## Configuration
