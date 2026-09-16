@@ -142,3 +142,53 @@ def test_narrow_terminal_truncation():
     import re
     clean_line2 = re.sub(r"\x1b\[[0-9;]*m", "", lines[1])
     assert len(clean_line2) <= 35
+
+
+def test_model_effort_quota_filtering():
+    payload = {
+        "product": "antigravity",
+        "model": {
+            "id": "Gemini 3.8 Flash (High)",
+            "display_name": "Gemini 3.8 Flash (High)",
+            "effort": "high",
+        },
+        "context_window": {
+            "used_percentage": 10.0,
+            "total_input_tokens": 1000,
+            "total_output_tokens": 500,
+        },
+        "quota": {
+            "gemini-3.7-flash-medium": {"remaining_fraction": 1.0, "reset_in_seconds": 0},
+            "gemini-3.8-flash-high": {"remaining_fraction": 0.8, "reset_in_seconds": 120},
+            "gemini-3.8-flash-low": {"remaining_fraction": 1.0, "reset_in_seconds": 0},
+            "gemini-3.8-flash-medium": {"remaining_fraction": 1.0, "reset_in_seconds": 0},
+        },
+        "terminal_width": 80,
+    }
+    proc = run_statusline(payload)
+    assert proc.returncode == 0
+    lines = proc.stdout.strip().split("\n")
+    assert len(lines) == 2
+    assert "3.8 Flash High:" in lines[1]
+    assert "3.7 Flash Medium" not in lines[1]
+    assert "3.8 Flash Low" not in lines[1]
+    assert "3.8 Flash Medium" not in lines[1]
+    assert "90%" in lines[1]
+
+
+def test_all_quotas_flag():
+    payload = {
+        "product": "antigravity",
+        "model": {"display_name": "Gemini 3.8 Flash (High)"},
+        "context_window": {"used_percentage": 5.0},
+        "quota": {
+            "gemini-3.8-flash-high": {"remaining_fraction": 1.0},
+            "gemini-3.8-flash-low": {"remaining_fraction": 1.0},
+        },
+        "terminal_width": 200,
+    }
+    proc = run_statusline(payload, env_vars={"AGY_ALL_QUOTAS": "1"})
+    assert proc.returncode == 0
+    assert "3.8 Flash High" in proc.stdout
+    assert "3.8 Flash Low" in proc.stdout
+

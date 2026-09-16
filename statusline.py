@@ -17,6 +17,7 @@ SHOW_BRANCH = os.environ.get("AGY_BRANCH", "1") == "1"
 SHOW_REMAINING = os.environ.get("AGY_REMAINING", "1") == "1"
 SHOW_BAR = os.environ.get("AGY_BAR", "1") == "1"
 SHOW_TASKS = os.environ.get("AGY_TASKS", "1") == "1"
+SHOW_ALL_QUOTAS = os.environ.get("AGY_ALL_QUOTAS", "0") == "1"
 
 # ── Read stdin ──────────────────────────────────────────────────
 raw = sys.stdin.read().strip()
@@ -75,7 +76,7 @@ def compact(n):
 
 
 def format_reset(minutes, compact=False):
-    if minutes is None:
+    if minutes is None or minutes <= 0:
         return ""
     m = int(minutes)
     if m >= 1440:
@@ -105,6 +106,57 @@ def used_pct_str(used_pct):
     else:
         bar = ""
     return f"{bar}{c}{val}%{N}"
+
+
+def select_quotas(quota_dict, model_data, show_all=False):
+    if show_all or not quota_dict or len(quota_dict) <= 1:
+        return quota_dict
+
+    general = {}
+    model_quotas = {}
+    for k, v in quota_dict.items():
+        k_low = k.lower()
+        if any(w in k_low for w in ("weekly", "7d", "daily", "24h", "5h")):
+            general[k] = v
+        else:
+            model_quotas[k] = v
+
+    if not model_quotas:
+        return general
+
+    disp = str(model_data.get("display_name") or "") if isinstance(model_data, dict) else str(model_data)
+    m_id = str(model_data.get("id") or "") if isinstance(model_data, dict) else ""
+    effort = str(model_data.get("effort") or "").lower() if isinstance(model_data, dict) else ""
+
+    candidates = []
+    for raw in (disp, m_id):
+        if raw:
+            n = re.sub(r"[^a-z0-9.]+", "-", raw.lower()).strip("-")
+            candidates.append(n)
+            if not n.startswith("gemini-"):
+                candidates.append(f"gemini-{n}")
+            if effort and not n.endswith(effort):
+                candidates.append(f"{n}-{effort}")
+                candidates.append(f"gemini-{n}-{effort}")
+
+    matched = {}
+    for cand in candidates:
+        if cand in model_quotas:
+            matched[cand] = model_quotas[cand]
+            break
+
+    if not matched:
+        for cand in candidates:
+            for k, v in model_quotas.items():
+                if k.startswith(cand) or cand.startswith(k):
+                    matched[k] = v
+                    break
+            if matched:
+                break
+
+    res = dict(general)
+    res.update(matched)
+    return res if res else quota_dict
 
 
 # ── Parse session data ──────────────────────────────────────────
@@ -206,7 +258,7 @@ if SHOW_TOKENS and (in_tok or out_tok):
 # Quotas
 quota_at = []
 quota_fallbacks = []
-quota_dict = d.get("quota") or {}
+quota_dict = select_quotas(d.get("quota") or {}, d.get("model", {}), SHOW_ALL_QUOTAS)
 for bucket_name, qdata in quota_dict.items():
     b_lower = bucket_name.lower()
     if "weekly" in b_lower or "7d" in b_lower:
