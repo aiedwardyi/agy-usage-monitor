@@ -42,5 +42,7 @@ Customise behaviour via environment variables (all prefixed with `AGY_`):
 | `AGY_BRANCH` | `1` | `1` shows git branch; `0` hides |
 | `AGY_TASKS` | `1` | `1` shows background task count; `0` hides |
 | `AGY_CONTEXT_SIZE` | `0` | `1` adds total context size label (e.g. `of 1M`) |
+| `AGY_ALL_QUOTAS` | `0` | `1` shows all quota buckets; `0` filters to active model |
 | `AGY_MAX_WIDTH` | auto | Override terminal column width budget |
+
 
