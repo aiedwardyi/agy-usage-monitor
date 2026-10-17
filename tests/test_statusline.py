@@ -192,3 +192,17 @@ def test_all_quotas_flag():
     assert "3.8 Flash High" in proc.stdout
     assert "3.8 Flash Low" in proc.stdout
 
+
+def test_null_and_malformed_payloads():
+    payloads = [
+        {"model": None, "context_window": None, "workspace": None},
+        {"quota": None, "task_count": "invalid", "terminal_width": None},
+        {"model": "Gemini 3.8 Flash", "quota": [1, 2, 3]},
+        {"model": {"display_name": None}, "context_window": {"used_percentage": None}},
+        {"quota": {"gemini-weekly": None}},
+    ]
+    for p in payloads:
+        proc = run_statusline(p)
+        assert proc.returncode == 0
+        assert len(proc.stdout.strip()) > 0
+
