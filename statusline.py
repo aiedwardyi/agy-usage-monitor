@@ -31,6 +31,10 @@ except json.JSONDecodeError:
     print("Antigravity")
     sys.exit(0)
 
+if not isinstance(d, dict):
+    print("Antigravity")
+    sys.exit(0)
+
 # Terminal width budget
 MAX_WIDTH = 80
 for candidate in (d.get("terminal_width"), os.environ.get("AGY_MAX_WIDTH"), os.environ.get("COLUMNS")):
@@ -109,6 +113,8 @@ def used_pct_str(used_pct):
 
 
 def select_quotas(quota_dict, model_data, show_all=False):
+    if not isinstance(quota_dict, dict):
+        return {}
     if show_all or not quota_dict or len(quota_dict) <= 1:
         return quota_dict
 
@@ -162,46 +168,53 @@ def select_quotas(quota_dict, model_data, show_all=False):
 # ── Parse session data ──────────────────────────────────────────
 model = "Gemini"
 try:
-    model = d.get("model", {}).get("display_name") or model
+    m = d.get("model")
+    if isinstance(m, dict):
+        model = m.get("display_name") or model
+    elif isinstance(m, str) and m:
+        model = m
     model = re.sub(r"\s*\((?:High|Medium|Low)\)$", "", model)
-except (KeyError, TypeError):
+except Exception:
     pass
 
 ctx_pct_used = 0
 ctx_size = 0
 try:
-    cw = d.get("context_window", {})
-    ctx_pct_used = int(round(float(cw.get("used_percentage") or 0)))
-    ctx_size = int(cw.get("context_window_size") or 0)
-except (KeyError, TypeError, ValueError):
+    cw = d.get("context_window")
+    if isinstance(cw, dict):
+        ctx_pct_used = int(round(float(cw.get("used_percentage") or 0)))
+        ctx_size = int(cw.get("context_window_size") or 0)
+except Exception:
     pass
 
 in_tok = 0
 out_tok = 0
 try:
-    cw = d.get("context_window", {})
-    in_tok = int(cw.get("total_input_tokens") or 0)
-    out_tok = int(cw.get("total_output_tokens") or 0)
-except (KeyError, TypeError, ValueError):
+    cw = d.get("context_window")
+    if isinstance(cw, dict):
+        in_tok = int(cw.get("total_input_tokens") or 0)
+        out_tok = int(cw.get("total_output_tokens") or 0)
+except Exception:
     pass
 
 proj_dir = ""
 proj_name = ""
 try:
-    proj_dir = (
-        d.get("workspace", {}).get("project_dir")
-        or d.get("workspace", {}).get("current_dir")
-        or d.get("cwd")
-        or ""
-    )
+    ws = d.get("workspace")
+    if isinstance(ws, dict):
+        proj_dir = ws.get("project_dir") or ws.get("current_dir") or ""
+    if not proj_dir:
+        proj_dir = d.get("cwd") or ""
     proj_name = os.path.basename(proj_dir) if proj_dir else ""
-except (KeyError, TypeError):
+except Exception:
     pass
 
 branch = ""
 try:
-    branch = d.get("vcs", {}).get("branch") or ""
-except (KeyError, TypeError):
+    vcs = d.get("vcs")
+    if isinstance(vcs, dict):
+        branch = vcs.get("branch") or ""
+except Exception:
     pass
 
 if not branch:
@@ -258,38 +271,56 @@ if SHOW_TOKENS and (in_tok or out_tok):
 # Quotas
 quota_at = []
 quota_fallbacks = []
-quota_dict = select_quotas(d.get("quota") or {}, d.get("model", {}), SHOW_ALL_QUOTAS)
-for bucket_name, qdata in quota_dict.items():
-    b_lower = bucket_name.lower()
-    if "weekly" in b_lower or "7d" in b_lower:
-        label = "Weekly"
-    elif "daily" in b_lower or "24h" in b_lower:
-        label = "Daily"
-    elif "5h" in b_lower:
-        label = "5h"
-    else:
-        label = bucket_name.replace("gemini-", "").replace("-", " ").title()
+quota_raw = d.get("quota")
+model_raw = d.get("model")
+quota_dict = select_quotas(
+    quota_raw if isinstance(quota_raw, dict) else {},
+    model_raw if isinstance(model_raw, dict) else {},
+    SHOW_ALL_QUOTAS,
+)
+if isinstance(quota_dict, dict):
+    for bucket_name, qdata in quota_dict.items():
+        if not isinstance(qdata, dict):
+            continue
+        b_lower = str(bucket_name).lower()
+        if "weekly" in b_lower or "7d" in b_lower:
+            label = "Weekly"
+        elif "daily" in b_lower or "24h" in b_lower:
+            label = "Daily"
+        elif "5h" in b_lower:
+            label = "5h"
+        else:
+            label = str(bucket_name).replace("gemini-", "").replace("-", " ").title()
 
-    rem_frac = qdata.get("remaining_fraction")
-    if rem_frac is not None:
-        rem_pct = int(round(float(rem_frac) * 100))
-        used_pct = max(0, min(100, 100 - rem_pct))
-        q_str = f"{label}: {used_pct_str(used_pct)}"
-    else:
-        q_str = f"{label}: --"
+        rem_frac = qdata.get("remaining_fraction")
+        if rem_frac is not None:
+            try:
+                rem_pct = int(round(float(rem_frac) * 100))
+                used_pct = max(0, min(100, 100 - rem_pct))
+                q_str = f"{label}: {used_pct_str(used_pct)}"
+            except (ValueError, TypeError):
+                q_str = f"{label}: --"
+        else:
+            q_str = f"{label}: --"
 
-    rem_sec = qdata.get("reset_in_seconds")
-    reset_min = int(rem_sec) // 60 if rem_sec is not None else None
-    reset_full = format_reset(reset_min) if SHOW_RESET else ""
-    reset_compact = format_reset(reset_min, compact=True) if SHOW_RESET else ""
+        rem_sec = qdata.get("reset_in_seconds")
+        try:
+            reset_min = int(rem_sec) // 60 if rem_sec is not None else None
+        except (ValueError, TypeError):
+            reset_min = None
+        reset_full = format_reset(reset_min) if SHOW_RESET else ""
+        reset_compact = format_reset(reset_min, compact=True) if SHOW_RESET else ""
 
-    quota_at.append(len(line2_segments))
-    line2_segments.append((q_str + reset_full, 1))
-    quota_fallbacks.append((q_str + reset_compact, q_str))
+        quota_at.append(len(line2_segments))
+        line2_segments.append((q_str + reset_full, 1))
+        quota_fallbacks.append((q_str + reset_compact, q_str))
 
 # Tasks
 if SHOW_TASKS:
-    task_count = int(d.get("task_count") or 0)
+    try:
+        task_count = int(d.get("task_count") or 0)
+    except (ValueError, TypeError):
+        task_count = 0
     if task_count > 0:
         line2_segments.append((f"{D}{task_count} task{'s' if task_count > 1 else ''}{N}", 3))
 
@@ -305,15 +336,17 @@ for idx, (compact_q, plain_q) in enumerate(quota_fallbacks):
     if len(strip_ansi(line2)) <= MAX_WIDTH:
         break
     pos = quota_at[idx]
-    line2_segments[pos] = (compact_q, line2_segments[pos][1])
-    line2 = build_line(line2_segments)
+    if pos < len(line2_segments):
+        line2_segments[pos] = (compact_q, line2_segments[pos][1])
+        line2 = build_line(line2_segments)
 
 for idx, (compact_q, plain_q) in enumerate(quota_fallbacks):
     if len(strip_ansi(line2)) <= MAX_WIDTH:
         break
     pos = quota_at[idx]
-    line2_segments[pos] = (plain_q, line2_segments[pos][1])
-    line2 = build_line(line2_segments)
+    if pos < len(line2_segments):
+        line2_segments[pos] = (plain_q, line2_segments[pos][1])
+        line2 = build_line(line2_segments)
 
 # Drop lowest-priority segments until it fits
 while len(strip_ansi(line2)) > MAX_WIDTH and line2_segments:
